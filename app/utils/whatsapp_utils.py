@@ -28,12 +28,6 @@ def get_text_message_input(recipient, text):
         }
     )
 
-
-def generate_response(response):
-    # Return text in uppercase
-    return response.lower()
-
-
 def send_message(data):
     headers = {
         "Content-type": "application/json",
@@ -59,7 +53,6 @@ def send_message(data):
         # Process the response as normal
         log_http_response(response)
         return response
-
 
 def process_text_for_whatsapp(text):
     # Remove brackets
@@ -141,30 +134,30 @@ def process_whatsapp_message(body):
 
     service = full_message_body.split()[0]
     language = full_message_body.split()[1].lower()
-    word = full_message_body.split(' ',2)[-1]
+    words = [word.strip() for word in full_message_body.split(' ',2)[-1].split(',')]
 
     if len(service.split('@'))>1:
         
         if service.split('@')[-1] == 'vocab':
 
             if language == 'en':
-                response_message = add_row_to_padme_vocab(language, word)
-                response_message += f"\n\n*{word}* added to database."
+                for word in words:
+                    response_message = add_row_to_padme_vocab(language, word)
+                    response_message += f"\n\n*{word}* added to database."
             elif language == 'fr':
-                add_row_to_padme_vocab(language, word)
-                response_message += f"\n\n*{word}* added to database."
+                for word in words:
+                    add_row_to_padme_vocab(language, word)
+                    response_message += f"\n\n*{word}* added to database."
             elif language == 'ru':
-                add_row_to_padme_vocab(language, word)
-                response_message += f"\n\n*{word}* added to database."
+                for word in words:
+                    add_row_to_padme_vocab(language, word)
+                    response_message += f"\n\n*{word}* added to database."
 
     else:
         response_message = "Error - no action taken."
 
-    response = generate_response(response_message)
-
-    data = get_text_message_input(current_app.config["RECIPIENT_WAID"], response)
+    data = get_text_message_input(current_app.config["RECIPIENT_WAID"], response_message)
     send_message(data)
-
 
 def is_valid_whatsapp_message(body):
     """

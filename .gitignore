@@ -96,3 +96,5 @@ google_sheets_credentials.json
 
 # venv
 venv
+
+tests.ipynb
