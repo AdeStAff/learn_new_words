@@ -117,7 +117,9 @@ def add_row_to_padme_vocab(language, word):
     if cat is not None and word_definition is not None:
 
         scope = ["https://spreadsheets.google.com/feeds",'https://www.googleapis.com/auth/spreadsheets',"https://www.googleapis.com/auth/drive.file","https://www.googleapis.com/auth/drive"]
-        creds = ServiceAccountCredentials.from_json_keyfile_name("google_sheets_credentials.json",scope)
+        creds_json = os.getenv("GOOGLE_SHEETS_CREDENTIALS")
+        creds_dict = json.loads(creds_json)
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
         sheet = client.open_by_key('1CloiuVCnGD38rPQogj1eG_yHAcQ7uxuQ4ICD_CswHhw').sheet1
         num_rows = len(sheet.get_all_values())
