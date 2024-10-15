@@ -1,0 +1,3 @@
+venv
+.env
+google_sheets_credentials.json
