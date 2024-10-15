@@ -144,20 +144,26 @@ def process_whatsapp_message(body):
                 for word in words:
                     response_message = add_row_to_padme_vocab(language, word)
                     response_message += f"\n\n*{word}* added to database."
+                    data = get_text_message_input(current_app.config["RECIPIENT_WAID"], response_message)
+                    send_message(data)
             elif language == 'fr':
                 for word in words:
-                    add_row_to_padme_vocab(language, word)
+                    response_message = add_row_to_padme_vocab(language, word)
                     response_message += f"\n\n*{word}* added to database."
+                    data = get_text_message_input(current_app.config["RECIPIENT_WAID"], response_message)
+                    send_message(data)
             elif language == 'ru':
                 for word in words:
-                    add_row_to_padme_vocab(language, word)
+                    response_message = add_row_to_padme_vocab(language, word)
                     response_message += f"\n\n*{word}* added to database."
+                    data = get_text_message_input(current_app.config["RECIPIENT_WAID"], response_message)
+                    send_message(data)
 
     else:
         response_message = "Error - no action taken."
+        data = get_text_message_input(current_app.config["RECIPIENT_WAID"], response_message)
+        send_message(data)
 
-    data = get_text_message_input(current_app.config["RECIPIENT_WAID"], response_message)
-    send_message(data)
 
 def is_valid_whatsapp_message(body):
     """
