@@ -71,43 +71,83 @@ def process_text_for_whatsapp(text):
 
     return whatsapp_style_text
 
-def lookup_en_def(word):
+def extract_word_and_category(text):
+    match = re.search(r'\((\w+)\)', text)
+    if match:
+        cat = match.group(1)  
+        word = re.sub(r'\s*\(\w+\)', '', text).strip() 
+        return [word, cat]
+    else:
+        return [text, ""]
+
+def lookup_en_def(full_word):
+    
+    error_message = None
     cat = None
     word_definition=None
     load_dotenv()
     api_key = os.getenv("DICT_DICT_KEY")
-    url = f"https://www.dictionaryapi.com/api/v3/references/collegiate/json/{word}?key={api_key}"
+    word_and_cat = extract_word_and_category(full_word)
+    word = word_and_cat[0]
+    if len(word_and_cat[-1])>1:
+        cat = word_and_cat[-1]
+
+    url = f"https://www.dictionaryapi.com/api/v3/references/learners/json/{word}?key={api_key}"
     response = requests.get(url)
 
     if response.status_code == 200:
         data = response.json()
-
-        if len(data) > 0 and "shortdef" and "fl"in data[0]:
-            cat = data[0]["fl"]
-            if len(data[0]["shortdef"])>1:
-                word_definition = ''
-                for definition in data[0]["shortdef"]:
-                    if len(word_definition)>0:
-                        word_definition += f"\n"    
-                    word_definition += f"•\u00A0 {definition}"
-                word_definition
+        if cat is not None:
+            i = 0
+            found_cat = False
+            while i<len(data):
+                if "fl" in data[i] and data[i]["fl"]==cat:
+                    found_cat = True
+                    break
+                i += 1
+            if found_cat==True:
+                if len(data[i]["shortdef"])>1:
+                    word_definition = ''
+                    for definition in data[i]["shortdef"]:
+                        if len(word_definition)>0:
+                            word_definition += f"\n"    
+                        word_definition += f"•\u00A0 {definition}"
+                    word_definition
+                else:
+                    word_definition = data[i]["shortdef"][0]
             else:
-                word_definition = data[0]["shortdef"][0]
+                word_definition = ''
+                error_message = f"{word} is not a {cat}."
         else:
-            word_definition = ''
-            print(f"No definition found for the word '{word}'.")
+            if len(data) > 0 and "shortdef" and "fl"in data[0]:
+                cat = data[0]["fl"]
+                if len(data[0]["shortdef"])>1:
+                    word_definition = ''
+                    for definition in data[0]["shortdef"]:
+                        if len(word_definition)>0:
+                            word_definition += f"\n"    
+                        word_definition += f"•\u00A0 {definition}"
+                    word_definition
+                else:
+                    word_definition = data[0]["shortdef"][0]
+            else:
+                word_definition = ''
+                error_message = f"No definition found for the word '{word}'"
 
     else:
         print(f"Failed to retrieve data: {response.status_code}")
     
-    return cat, word_definition
+    return cat, word_definition, error_message
 
 def add_row_to_padme_vocab(language, word):
     
     if language == "en":
-        cat, word_definition = lookup_en_def(word)
+        cat, word_definition, error_message = lookup_en_def(word)
     
-    if cat is not None and word_definition is not None:
+    if error_message is not None:
+        return error_message
+
+    elif cat is not None and word_definition is not None:
 
         scope = ["https://spreadsheets.google.com/feeds",'https://www.googleapis.com/auth/spreadsheets',"https://www.googleapis.com/auth/drive.file","https://www.googleapis.com/auth/drive"]
         creds_json = os.getenv("GOOGLE_SHEETS_CREDENTIALS")
@@ -125,7 +165,10 @@ def add_row_to_padme_vocab(language, word):
         else:
             message = f"*{word}*: {word_definition}"
         
-        return message
+    else:
+        message = "Retrieval failed."
+
+    return message
 
 def process_whatsapp_message(body):
 
