@@ -16,7 +16,6 @@ def log_http_response(response):
     logging.info(f"Content-type: {response.headers.get('content-type')}")
     logging.info(f"Body: {response.text}")
 
-
 def get_text_message_input(recipient, text):
     return json.dumps(
         {
@@ -86,7 +85,7 @@ def lookup_en_def(full_word):
     cat = None
     word_definition=None
     load_dotenv()
-    api_key = os.getenv("DICT_DICT_KEY")
+    api_key = os.getenv("DICT_LEARNER_KEY")
     word_and_cat = extract_word_and_category(full_word)
     word = word_and_cat[0]
     if len(word_and_cat[-1])>1:
@@ -136,14 +135,14 @@ def lookup_en_def(full_word):
 
     else:
         print(f"Failed to retrieve data: {response.status_code}")
-    
-    return cat, word_definition, error_message
+
+    return word, cat, word_definition, error_message
 
 def add_row_to_padme_vocab(language, word):
     
     if language == "en":
-        cat, word_definition, error_message = lookup_en_def(word)
-    
+        word, cat, word_definition, error_message = lookup_en_def(word)
+
     if error_message is not None:
         return error_message
 
@@ -174,39 +173,35 @@ def process_whatsapp_message(body):
 
     message = body["entry"][0]["changes"][0]["value"]["messages"][0]
     full_message_body = message["text"]["body"]
-
-    service = full_message_body.split()[0]
+    service = full_message_body.split()[0].strip().lower()
     language = full_message_body.split()[1].lower()
     words = [word.strip() for word in full_message_body.split(' ',2)[-1].split(',')]
-
-    if len(service.split('@'))>1:
         
-        if service.split('@')[-1] == 'vocab':
+    if service == 'vocab':
 
-            if language == 'en':
-                for word in words:
-                    response_message = add_row_to_padme_vocab(language, word)
-                    response_message += f"\n\n*{word}* added to database."
-                    data = get_text_message_input(current_app.config["RECIPIENT_WAID"], response_message)
-                    send_message(data)
-            elif language == 'fr':
-                for word in words:
-                    response_message = add_row_to_padme_vocab(language, word)
-                    response_message += f"\n\n*{word}* added to database."
-                    data = get_text_message_input(current_app.config["RECIPIENT_WAID"], response_message)
-                    send_message(data)
-            elif language == 'ru':
-                for word in words:
-                    response_message = add_row_to_padme_vocab(language, word)
-                    response_message += f"\n\n*{word}* added to database."
-                    data = get_text_message_input(current_app.config["RECIPIENT_WAID"], response_message)
-                    send_message(data)
+        if language == 'en':
+            for word in words:
+                response_message = add_row_to_padme_vocab(language, word)
+                response_message += f"\n\n*{word}* added to database."
+                data = get_text_message_input(current_app.config["RECIPIENT_WAID"], response_message)
+                send_message(data)
+        elif language == 'fr':
+            for word in words:
+                response_message = add_row_to_padme_vocab(language, word)
+                response_message += f"\n\n*{word}* added to database."
+                data = get_text_message_input(current_app.config["RECIPIENT_WAID"], response_message)
+                send_message(data)
+        elif language == 'ru':
+            for word in words:
+                response_message = add_row_to_padme_vocab(language, word)
+                response_message += f"\n\n*{word}* added to database."
+                data = get_text_message_input(current_app.config["RECIPIENT_WAID"], response_message)
+                send_message(data)
 
     else:
         response_message = "Error - no action taken."
         data = get_text_message_input(current_app.config["RECIPIENT_WAID"], response_message)
         send_message(data)
-
 
 def is_valid_whatsapp_message(body):
     """
