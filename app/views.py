@@ -46,11 +46,11 @@ def handle_message():
             # if the request is not a WhatsApp API event, return an error
             return (
                 jsonify({"status": "error", "message": "Not a WhatsApp API event"}),
-                404,
+                200,
             )
     except json.JSONDecodeError:
         logging.error("Failed to decode JSON")
-        return jsonify({"status": "error", "message": "Invalid JSON provided"}), 400
+        return jsonify({"status": "error", "message": "Invalid JSON provided"}), 200
 
 
 # Required webhook verifictaion for WhatsApp
