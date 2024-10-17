@@ -7,12 +7,15 @@ from .decorators.security import signature_required
 from .utils.whatsapp_utils import (
     process_whatsapp_message,
     is_valid_whatsapp_message,
+    is_duplicate_message,
+    store_message_id,
 )
+from google.cloud import datastore
 
 webhook_blueprint = Blueprint("webhook", __name__)
+client = datastore.Client()
 
-
-def handle_message():
+def handle_message(client):
     """
     Handle incoming webhook events from the WhatsApp API.
 
@@ -27,7 +30,6 @@ def handle_message():
         response: A tuple containing a JSON response and an HTTP status code.
     """
     body = request.get_json()
-    logging.info(f"request body: {body}")
 
     # Check if it's a WhatsApp status update
     if (
@@ -38,9 +40,16 @@ def handle_message():
     ):
         logging.info("Received a WhatsApp status update.")
         return jsonify({"status": "ok"}), 200
+    message_id = body['entry'][0]['changes'][0]['value']['messages'][0]['id']
+    logging.info(f"message_id: {message_id}")
+
+    if is_duplicate_message(client, message_id):
+        logging.info(f"Duplicate message received: {message_id}")
+        return jsonify({"status": "duplicate"}), 200
     try:
         if is_valid_whatsapp_message(body):
             process_whatsapp_message(body)
+            store_message_id(client, message_id)
             return jsonify({"status": "ok"}), 200
         else:
             # if the request is not a WhatsApp API event, return an error
@@ -83,6 +92,6 @@ def webhook_get():
 @webhook_blueprint.route("/webhook", methods=["POST"])
 @signature_required
 def webhook_post():
-    return handle_message()
+    return handle_message(client)
 
 

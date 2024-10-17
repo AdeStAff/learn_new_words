@@ -9,7 +9,20 @@ from pprint import pprint as pp
 import os
 from dotenv import load_dotenv
 from larousse_api import larousse
+from google.cloud import datastore
 
+def is_duplicate_message(client, message_id):
+    # Create a key for the message ID
+    key = client.key("MessageID", message_id)
+    entity = client.get(key)
+    return entity is not None
+
+def store_message_id(client, message_id):
+    # Create a new entity to store the message ID
+    key = client.key("MessageID", message_id)
+    entity = datastore.Entity(key)
+    entity.update({"processed": True})
+    client.put(entity)
 
 def log_http_response(response):
     logging.info(f"Status: {response.status_code}")
@@ -141,9 +154,34 @@ def lookup_en_def(full_word):
                         if len(word_definition)>0:
                             word_definition += f"\n"    
                         word_definition += f"•\u00A0 {definition}"
-                    word_definition
                 else:
-                    word_definition = data[0]["shortdef"][0]
+                    try:
+                        word_definition = data[0]["shortdef"][0]
+                    except IndexError:
+                        try:
+                            second_api_key = os.getenv("DICT_DICT_KEY")
+                            url = f"https://www.dictionaryapi.com/api/v3/references/collegiate/json/{word}?key={second_api_key}"
+                            response = requests.get(url)
+                            if response.status_code == 200:
+                                data = response.json()
+                                if "fl" in data[0] and "shortdef" in data[0]:
+                                    cat = data[0]["fl"]
+                                    if len(data[0]["shortdef"])>1:
+                                        word_definition = ''
+                                        for definition in data[0]["shortdef"]:
+                                            if len(word_definition)>0:
+                                                word_definition += f"\n"    
+                                            word_definition += f"•\u00A0 {definition}"
+                                    elif len(data[0]["shortdef"]) == 1 :
+                                        word_definition = data[0]["shortdef"][0]
+                                else:
+                                    error_message = f"No definition found for the word '{word}'"
+                            else:
+                                error_message = f"Failed to use the API for the word '{word}'"
+
+                        except:
+                            error_message = f"No definition found for the word '{word}'"
+
             else:
                 word_definition = ''
                 error_message = f"No definition found for the word '{word}'"
