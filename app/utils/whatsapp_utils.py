@@ -96,6 +96,22 @@ def lookup_en_def(full_word):
 
     if response.status_code == 200:
         data = response.json()
+        
+        # If word not found
+
+
+        if "fl" not in data[0]:
+            # Use other dictionnary api
+            second_api_key = os.getenv("DICT_DICT_KEY")
+            
+            url = f"https://www.dictionaryapi.com/api/v3/references/collegiate/json/{word}?key={second_api_key}"
+            response = requests.get(url)
+            if response.status_code == 200:
+                data = response.json()
+                if "fl" not in data[0]:
+                    error_message = f"{word} not found in any dictionnary."
+                    return word, cat, word_definition, error_message
+                
         if cat is not None:
             i = 0
             found_cat = False
@@ -140,11 +156,14 @@ def lookup_en_def(full_word):
 
 def add_row_to_padme_vocab(language, word):
     
+    error_status = False
+
     if language == "en":
         word, cat, word_definition, error_message = lookup_en_def(word)
 
     if error_message is not None:
-        return error_message
+        error_status = True
+        return error_message, error_status
 
     elif cat is not None and word_definition is not None:
 
@@ -167,7 +186,7 @@ def add_row_to_padme_vocab(language, word):
     else:
         message = "Retrieval failed."
 
-    return message
+    return message, error_status
 
 def process_whatsapp_message(body):
 
@@ -181,8 +200,11 @@ def process_whatsapp_message(body):
 
         if language == 'en':
             for word in words:
-                response_message = add_row_to_padme_vocab(language, word)
-                response_message += f"\n\n*{word}* added to database."
+                response_message, error_status = add_row_to_padme_vocab(language, word)
+                if error_status:
+                    response_message += f"\n\nNo action taken."
+                else:
+                    response_message += f"\n\n*{word}* added to database."
                 data = get_text_message_input(current_app.config["RECIPIENT_WAID"], response_message)
                 send_message(data)
         elif language == 'fr':
