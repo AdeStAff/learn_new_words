@@ -99,8 +99,7 @@ def lookup_en_def(full_word):
         
         # If word not found
 
-
-        if "fl" not in data[0]:
+        if len(data)>0 and "fl" not in data[0]:
             # Use other dictionnary api
             second_api_key = os.getenv("DICT_DICT_KEY")
             
@@ -108,7 +107,7 @@ def lookup_en_def(full_word):
             response = requests.get(url)
             if response.status_code == 200:
                 data = response.json()
-                if "fl" not in data[0]:
+                if len(data)>0 and "fl" not in data[0]:
                     error_message = f"{word} not found in any dictionnary."
                     return word, cat, word_definition, error_message
                 
