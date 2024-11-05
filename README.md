@@ -10,7 +10,7 @@
 
 ## How Does It Work?
 
-1. **Send a Message**: The user sends a message to *Vidya*, starting with "vocab" followed by the language code ("en" for English, "fr_to_en" for French to English translation).
+1. **Send a Message**: The user sends a message to *Vidya*, starting with "vocab" followed by the language code ("en" for English, "fr" for French, "fren" for French to English translation).
 2. **Fetch Definition**: *Vidya* fetches the word or expression's definition.
 3. **Receive Response**: It sends the definition back via WhatsApp.
 4. **Save to Database**: The word or expression, along with its definition, is saved to the vocabulary database.
@@ -18,12 +18,12 @@
 ## Where Do the Definitions Come From?
 
 - **English**: Merriam-Webster, a leading authority in American English.
+- **French**: Wiktionary.
 - **French to English**: Wiktionary.
+
 
 ## Next Steps
 
-- **Add more languages**:
-    - French
 - **Add Translation Capabilities**:
     - French ↔ Spanish
     - French ↔ Russian

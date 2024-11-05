@@ -84,10 +84,10 @@ def process_text_for_whatsapp(text):
     return whatsapp_style_text
 
 def extract_word_and_category(text):
-    match = re.search(r'\((\w+)\)', text)
+    match = re.search(r'\(([^)]+)\)', text)
     if match:
-        cat = match.group(1)  
-        word = re.sub(r'\s*\(\w+\)', '', text).strip() 
+        cat = match.group(1).strip()
+        word = re.sub(r'\s*\(([^)]+)\)', '', text).strip() 
         return [word, cat]
     else:
         return [text, ""]
@@ -224,6 +224,14 @@ def lookup_fr_to_en_def(full_word):
                         sub_section_content = sub_sections[j + 1].strip()
                         if sub_section == cat:
                             matches = re.findall(r'\n\n(.*?)\n\n\n', sub_section_content, re.DOTALL)
+                            if len(matches)==0:
+                                matches = re.findall(r'\n\n(.*?)\n', sub_section_content, re.DOTALL)                            
+                                if len(matches)==0:
+                                    matches = re.findall(r'\n\n(.*)', sub_section_content, re.DOTALL)
+                                    if len(matches)==0:
+                                        error_message= f"No definition found for the word {word}. Error of matches."
+                                        return word, cat, word_definition, error_message
+
                             definitions_int = matches[0].strip()
                             definitions = definitions_int.split("\n")
                             definitions_final = []
@@ -246,6 +254,75 @@ def lookup_fr_to_en_def(full_word):
         error_message = f"There is a bug, please contact Augustin."
         return word, cat, word_definition, error_message
 
+def lookup_fr_to_fr_def(full_word):
+    error_message = None
+    word_definition = None
+    word, cat = extract_word_and_category(full_word)
+    if len(cat)==0:
+        error_message=f"Please specify in parantheses the category of the word: verb, noun, adjective, adverb, expression.\nExample: berger (noun)"
+        return full_word, None, None, error_message
+
+    url = f"https://fr.wiktionary.org/w/api.php"
+    params = {
+        "action": "query",
+        "format": "json",
+        "titles": word,
+        "prop": "extracts",
+        "explaintext": True,
+    }
+
+    response = requests.get(url, params=params)
+    data = response.json()
+    pages = data["query"]["pages"]
+    for page in pages.values():
+        extract = page.get("extract", None)
+        if extract:
+            language_sections = re.split(r"(?m)^==\s+(.*?)\s+==\s*$", extract)
+            for i in range(1, len(language_sections), 2):
+                language = language_sections[i].strip().lower()  # Language name
+                content = language_sections[i + 1].strip()  # Content for that language section
+                if language == 'français':
+                    sub_sections = re.split(r"(?m)^===\s+(.*?)\s+===\s*$", content)
+                    for j in range(1, len(sub_sections), 2):
+                        sub_section = sub_sections[j].strip().lower()
+                        sub_section_content = sub_sections[j + 1].strip()
+                        if sub_section == cat:
+                            matches = re.findall(r'\n\n(.*?)\n\n\n', sub_section_content, re.DOTALL)
+                            if len(matches)==0:
+                                matches = re.findall(r'\n\n(.*?)\n', sub_section_content, re.DOTALL)                            
+                                if len(matches)==0:
+                                    matches = re.findall(r'\n\n(.*)', sub_section_content, re.DOTALL)
+                                    if len(matches)==0:
+                                        error_message= f"No definition found for the word {word}. Error of matches."
+                                        return word, cat, word_definition, error_message                            
+                            
+                            definitions_int = matches[0].strip()
+                            definitions = definitions_int.split("\n")
+                            definitions_final = []
+                            for definition in definitions:
+                                if (
+                                    len(definition.split()) > 0 
+                                    and definition.split()[0] not in {"Synonyms:", "Synonym:", "Antonym:", "Antonyms:"} 
+                                    and "—" not in definition
+                                    and not any(variant in definition.lower() for variant in {word, word + "e", word + "s", word + "es"})
+                                ):
+                                    definitions_final.append(definition)
+                            if len(definitions_final)>1:
+                                word_definition = ''
+                                for definition in definitions_final:
+                                    if len (word_definition)>0:
+                                        word_definition += f"\n"
+                                    word_definition += f"•\u00A0 {definition}"
+                            else:
+                                word_definition = definitions_final[0]
+                            return word, cat, word_definition, error_message
+                    error_message = f"No definition found for the word {word} in the {cat} category. Are you sure *{word} is a {cat}?*\n\nIf you need the list of gramatical categories, send a message using the following template: 'vocab categories language'.\n\nFor example, in French: 'vocab categories fr'"
+                    return word, cat, word_definition, error_message
+            error_message= f"No definition found for the word {word}"
+            return word, cat, word_definition, error_message
+        error_message = f"There is a bug, please contact Augustin."
+        return word, cat, word_definition, error_message
+
 
 def add_row_to_padme_vocab(language, word):
     
@@ -255,8 +332,69 @@ def add_row_to_padme_vocab(language, word):
     if language == "en":
         word, cat, word_definition, error_message = lookup_en_def(word)
     
-    if language == "fr_to_en":
+    if language == "fren":
         word, cat, word_definition, error_message = lookup_fr_to_en_def(word)
+
+    if language == "fr":
+        word, cat, word_definition, error_message = lookup_fr_to_fr_def(word)
+
+    if language in {"categories", "categorie", "category"}:
+        if word.strip().lower()=='fr':
+            error_message = f"""Please choose a gramatical category among the following:
+            • Nom commun
+            • Nom propre
+            • Adjectif
+            • Verbe
+            • Adverbe
+            • Pronom
+            • Préposition
+            • Conjonction
+            • Interjection
+            • Déterminant
+            • Article
+            • Onomatopée
+            • Locution nominale
+            • Locution verbale
+            • Locution adjectivale
+            • Locution adverbiale
+            • Locution prépositive
+            """
+        elif word.strip().lower()=='fren':
+            error_message = """Please choose a gramatical category among the following:
+            • Noun
+            • Proper noun
+            • Adjective
+            • Verb
+            • Adverb
+            • Pronoun
+            • Preposition
+            • Conjunction
+            • Interjection
+            • Determiner
+            • Article
+            • Onomatopoeia
+            • Phrase
+            """
+
+
+        elif word.strip().lower()=='en':
+            error_message = """No need to specify the category every time, but here is the list:
+            • Noun
+            • Pronoun
+            • Verb
+            • Adjective
+            • Adverb
+            • Preposition
+            • Conjunction
+            • Interjection
+            • Article"""
+        
+        else :
+            error_message = "This language does not exist or is not supported."
+    
+    if language not in {"en", "fr", "fren", "categories","categorie", "category"}:
+        error_message = "This language does not exist or is not supported."
+    
 
     if error_message is not None:
         error_status = True
