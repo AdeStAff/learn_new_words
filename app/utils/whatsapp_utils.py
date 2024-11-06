@@ -220,7 +220,7 @@ def lookup_fr_to_en_def(full_word):
                 if language == 'french':
                     sub_sections = re.split(r"(?m)^===\s+(.*?)\s+===\s*$", content)
                     for j in range(1, len(sub_sections), 2):
-                        sub_section = sub_sections[j].strip().lower()
+                        sub_section = re.sub(r'\d+', '',sub_sections[j]).strip().lower()
                         sub_section_content = sub_sections[j + 1].strip()
                         if sub_section == cat:
                             matches = re.findall(r'\n\n(.*?)\n\n\n', sub_section_content, re.DOTALL)
@@ -244,8 +244,10 @@ def lookup_fr_to_en_def(full_word):
                                     if len (word_definition)>0:
                                         word_definition += f"\n"
                                     word_definition += f"•\u00A0 {definition}"
-                            else:
+                            elif len(definitions_final)==1:
                                 word_definition = definitions_final[0]
+                            else:
+                                error_message = f"Word found, but definition not retrieved"
                             return word, cat, word_definition, error_message
                     error_message = f"No definition found for the word {word} in the {cat} category. Are you sure it is a {cat}?"
                     return word, cat, word_definition, error_message
@@ -284,7 +286,7 @@ def lookup_fr_to_fr_def(full_word):
                 if language == 'français':
                     sub_sections = re.split(r"(?m)^===\s+(.*?)\s+===\s*$", content)
                     for j in range(1, len(sub_sections), 2):
-                        sub_section = sub_sections[j].strip().lower()
+                        sub_section = re.sub(r'\d+', '',sub_sections[j]).strip().lower()
                         sub_section_content = sub_sections[j + 1].strip()
                         if sub_section == cat:
                             matches = re.findall(r'\n\n(.*?)\n\n\n', sub_section_content, re.DOTALL)
@@ -303,7 +305,7 @@ def lookup_fr_to_fr_def(full_word):
                                 if (
                                     len(definition.split()) > 0 
                                     and definition.split()[0] not in {"Synonyms:", "Synonym:", "Antonym:", "Antonyms:"} 
-                                    and "—" not in definition
+                                    and ("—" not in definition or "— Note" in definition)
                                     and not any(variant in definition.lower() for variant in {word, word + "e", word + "s", word + "es"})
                                 ):
                                     definitions_final.append(definition)
@@ -313,8 +315,10 @@ def lookup_fr_to_fr_def(full_word):
                                     if len (word_definition)>0:
                                         word_definition += f"\n"
                                     word_definition += f"•\u00A0 {definition}"
-                            else:
+                            elif len(definitions_final)==1:
                                 word_definition = definitions_final[0]
+                            else:
+                                error_message = f"Word found, but definition not retrieved"
                             return word, cat, word_definition, error_message
                     error_message = f"No definition found for the word {word} in the {cat} category. Are you sure *{word} is a {cat}?*\n\nIf you need the list of gramatical categories, send a message using the following template: 'vocab categories language'.\n\nFor example, in French: 'vocab categories fr'"
                     return word, cat, word_definition, error_message
