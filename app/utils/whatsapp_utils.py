@@ -83,27 +83,41 @@ def process_text_for_whatsapp(text):
 
     return whatsapp_style_text
 
-def extract_word_and_category(text):
-    match = re.search(r'\(([^)]+)\)', text)
-    if match:
-        cat = match.group(1).strip()
-        word = re.sub(r'\s*\(([^)]+)\)', '', text).strip() 
-        return [word, cat]
+def extract_word_and_category_and_quote(text):
+    cat, quote, word, quote_style = "", "", text.strip(), None
+    match_cat = re.search(r'\((.*)\)', text)
+    match_quote = re.search(r'\"(.*?)\"', text) 
+    if match_quote:
+        quote = match_quote.group(1).strip()
+        word = re.sub(r'\s*\"(.*)\"', '', word).strip()
     else:
-        return [text, ""]
+        match_quote = re.search(r'«(.*?)»', text)
+        if match_quote:
+            quote = match_quote.group(1).strip()
+            word = re.sub(r'\s*«(.*)»', '', word).strip()
+    if match_cat:
+        cat = match_cat.group(1).strip()
+        word = re.sub(r'\s*\((.*)\)', '', word).strip() 
+
+    return [word, cat, quote]
 
 def lookup_en_def(full_word):
     
-    error_message = None
-    cat = None
     word_definition=None
+    cat = None
+    quote = None
+    error_message = None
     load_dotenv()
     api_key = os.getenv("DICT_LEARNER_KEY")
-    word_and_cat = extract_word_and_category(full_word)
-    word = word_and_cat[0]
-    if len(word_and_cat[-1])>1:
-        cat = word_and_cat[-1]
-
+    word_and_cat_and_quote = extract_word_and_category_and_quote(full_word)
+    word = word_and_cat_and_quote[0]
+    if len(word_and_cat_and_quote[1])>1:
+        cat = word_and_cat_and_quote[1]
+    if len(word_and_cat_and_quote[2])>1:
+        quote = word_and_cat_and_quote[2]
+    print("")
+    print(word)
+    print("")
     url = f"https://www.dictionaryapi.com/api/v3/references/learners/json/{word}?key={api_key}"
     response = requests.get(url)
 
@@ -122,7 +136,7 @@ def lookup_en_def(full_word):
                 data = response.json()
                 if len(data)>0 and "fl" not in data[0]:
                     error_message = f"{word} not found in any dictionnary."
-                    return word, cat, word_definition, error_message
+                    return word, cat, word_definition, quote, error_message
                 
         if cat is not None:
             i = 0
@@ -188,15 +202,15 @@ def lookup_en_def(full_word):
     else:
         print(f"Failed to retrieve data: {response.status_code}")
 
-    return word, cat, word_definition, error_message
+    return word, cat, word_definition, quote, error_message
 
 def lookup_fr_to_en_def(full_word):
     error_message = None
     word_definition = None
-    word, cat = extract_word_and_category(full_word)
+    word, cat, quote = extract_word_and_category_and_quote(full_word)
     if len(cat)==0:
         error_message=f"Please specify in parantheses the category of the word: verb, noun, adjective, adverb, expression.\nExample: berger (noun)"
-        return full_word, None, None, error_message
+        return full_word, None, None, quote, error_message
 
     url = f"https://en.wiktionary.org/w/api.php"
     params = {
@@ -230,7 +244,7 @@ def lookup_fr_to_en_def(full_word):
                                     matches = re.findall(r'\n\n(.*)', sub_section_content, re.DOTALL)
                                     if len(matches)==0:
                                         error_message= f"No definition found for the word {word}. Error of matches."
-                                        return word, cat, word_definition, error_message
+                                        return word, cat, word_definition, quote, error_message
 
                             definitions_int = matches[0].strip()
                             definitions = definitions_int.split("\n")
@@ -248,21 +262,21 @@ def lookup_fr_to_en_def(full_word):
                                 word_definition = definitions_final[0]
                             else:
                                 error_message = f"Word found, but definition not retrieved"
-                            return word, cat, word_definition, error_message
+                            return word, cat, word_definition, quote, error_message
                     error_message = f"No definition found for the word {word} in the {cat} category. Are you sure it is a {cat}?"
-                    return word, cat, word_definition, error_message
+                    return word, cat, word_definition, quote, error_message
             error_message= f"No definition found for the word {word}"
-            return word, cat, word_definition, error_message
+            return word, cat, word_definition, quote, error_message
         error_message = f"There is a bug, please contact Augustin."
-        return word, cat, word_definition, error_message
+        return word, cat, word_definition, quote, error_message
 
 def lookup_fr_to_fr_def(full_word):
     error_message = None
     word_definition = None
-    word, cat = extract_word_and_category(full_word)
+    word, cat, quote = extract_word_and_category_and_quote(full_word)
     if len(cat)==0:
         error_message=f"Please specify in parantheses the category of the word: verb, noun, adjective, adverb, expression.\nExample: berger (noun)"
-        return full_word, None, None, error_message
+        return full_word, None, None, quote, error_message
 
     url = f"https://fr.wiktionary.org/w/api.php"
     params = {
@@ -296,7 +310,7 @@ def lookup_fr_to_fr_def(full_word):
                                     matches = re.findall(r'\n\n(.*)', sub_section_content, re.DOTALL)
                                     if len(matches)==0:
                                         error_message= f"No definition found for the word {word}. Error of matches."
-                                        return word, cat, word_definition, error_message                            
+                                        return word, cat, word_definition, quote, error_message                            
                             
                             definitions_int = matches[0].strip()
                             definitions = definitions_int.split("\n")
@@ -319,14 +333,13 @@ def lookup_fr_to_fr_def(full_word):
                                 word_definition = definitions_final[0]
                             else:
                                 error_message = f"Word found, but definition not retrieved"
-                            return word, cat, word_definition, error_message
+                            return word, cat, word_definition, quote, error_message
                     error_message = f"No definition found for the word {word} in the {cat} category. Are you sure *{word} is a {cat}?*\n\nIf you need the list of gramatical categories, send a message using the following template: 'vocab categories language'.\n\nFor example, in French: 'vocab categories fr'"
-                    return word, cat, word_definition, error_message
+                    return word, cat, word_definition, quote, error_message
             error_message= f"No definition found for the word {word}"
-            return word, cat, word_definition, error_message
+            return word, cat, word_definition, quote, error_message
         error_message = f"There is a bug, please contact Augustin."
-        return word, cat, word_definition, error_message
-
+        return word, cat, word_definition, quote, error_message
 
 def add_row_to_padme_vocab(language, word):
     
@@ -334,13 +347,13 @@ def add_row_to_padme_vocab(language, word):
     print(language)
 
     if language == "en":
-        word, cat, word_definition, error_message = lookup_en_def(word)
+        word, cat, word_definition, quote, error_message = lookup_en_def(word)
     
     if language == "fren":
-        word, cat, word_definition, error_message = lookup_fr_to_en_def(word)
+        word, cat, word_definition, quote, error_message = lookup_fr_to_en_def(word)
 
     if language == "fr":
-        word, cat, word_definition, error_message = lookup_fr_to_fr_def(word)
+        word, cat, word_definition, quote, error_message = lookup_fr_to_fr_def(word)
 
     if language in {"categories", "categorie", "category"}:
         if word.strip().lower()=='fr':
@@ -414,7 +427,7 @@ def add_row_to_padme_vocab(language, word):
         sheet = client.open_by_key('1CloiuVCnGD38rPQogj1eG_yHAcQ7uxuQ4ICD_CswHhw').sheet1
         num_rows = len(sheet.get_all_values())
 
-        new_row = [language, word, cat, word_definition]
+        new_row = [language, word, cat, word_definition, quote]
 
         sheet.insert_row(new_row, num_rows + 1)
         if word_definition[0]==f'•':

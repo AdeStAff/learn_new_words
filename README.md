@@ -15,6 +15,13 @@
 3. **Receive Response**: It sends the definition back via WhatsApp.
 4. **Save to Database**: The word or expression, along with its definition, is saved to the vocabulary database.
 
+# Capabilities
+
+- Specify the grammatical category of a word or expression, e.g., `vocab en shepherd (noun)`.
+- Retrieve the list of grammatical categories with: `vocab categories {language}`, e.g., `vocab categories fr`.
+- Add a quotation to the database by enclosing it in quotation marks, e.g., `vocab en shepherd (noun) "The shepherd guided his flock of sheep across the rolling hills as the sun set behind him."`.
+
+
 ## Where Do the Definitions Come From?
 
 - **English**: Merriam-Webster, a leading authority in American English.
@@ -27,6 +34,5 @@
 - **Add Translation Capabilities**:
     - French ↔ Spanish
     - French ↔ Russian
-- **Add Quote Integration**: Allow users to save example quotes for words in the database.
 
 ---
