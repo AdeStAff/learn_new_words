@@ -557,8 +557,8 @@ def process_whatsapp_message(body):
             send_audio_message(current_app.config["RECIPIENT_WAID"],
                                 lang="fr",
                                 word=to_say)
-        except:
-            error_message = "Tried to send you a vocal, but could not."
+        except Exception as e:
+            error_message = f"Tried to send you a vocal, but could not: {e}"
             data = get_text_message_input(current_app.config["RECIPIENT_WAID"], error_message)
             send_message(data)
 
@@ -567,9 +567,10 @@ def process_whatsapp_message(body):
             send_audio_message(current_app.config["RECIPIENT_WAID"],
                             lang="en",
                             word=to_say)
-        except:
-            error_message = "Tried to send you a vocal, but could not."
+        except Exception as e:
+            error_message = f"Tried to send you a vocal, but could not: {e}"
             data = get_text_message_input(current_app.config["RECIPIENT_WAID"], error_message)
+            send_message(data)
 
     else:
         response_message = "Error - no action taken."
