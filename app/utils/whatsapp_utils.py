@@ -9,7 +9,12 @@ from pprint import pprint as pp
 import os
 from dotenv import load_dotenv
 from larousse_api import larousse
-from google.cloud import datastore
+from google.cloud import datastore, storage
+import mimetypes
+from io import BytesIO 
+from gtts import gTTS
+from pydub import AudioSegment
+
 
 def is_duplicate_message(client, message_id):
     # Create a key for the message ID
@@ -39,6 +44,93 @@ def get_text_message_input(recipient, text):
             "text": {"preview_url": False, "body": text},
         }
     )
+
+def get_audio_message_input(recipient, audio_url):
+    return json.dumps(
+        {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": recipient,
+            "type": "audio",
+            "audio": {
+                "link": audio_url  
+            },
+        }
+    )
+
+def upload_audio(file_obj):
+
+    url = f"https://graph.facebook.com/{current_app.config['VERSION']}/{current_app.config['PHONE_NUMBER_ID']}/media"
+    headers = {
+        "Authorization": f"Bearer {current_app.config['ACCESS_TOKEN']}",
+    }
+    mime_type = 'audio/ogg; codecs=opus'
+    if not mime_type:
+        print("Could not determine MIME type. Please check the file path and extension.")
+        return None
+
+    # Construct payload with both files and data for multipart request
+    files = {
+        'file': ('audio.opus', file_obj, mime_type)
+    }
+    data = {
+        "messaging_product": "whatsapp"
+    }
+
+    # Send the request as multipart/form-data
+    response = requests.post(url, headers=headers, files=files, data=data)
+    if response.status_code == 200:
+        media_id = response.json().get('id')
+        print("Media uploaded successfully, media ID:", media_id)
+        return media_id
+    else:
+        print(f"Failed to upload media: {response.status_code} - {response.text}")
+        return None
+
+def generate_audio_file(lang, word):
+    
+    tts = gTTS(text=word, lang=lang)
+    mp3_buffer = BytesIO()
+    tts.write_to_fp(mp3_buffer)
+    mp3_buffer.seek(0)  # Reset buffer position
+
+    # Load the MP3 file from memory and convert to OPUS using pydub
+    audio = AudioSegment.from_file(mp3_buffer, format="mp3")
+    opus_buffer = BytesIO()
+    audio.export(opus_buffer, format="opus")
+    opus_buffer.seek(0)  # Reset buffer position
+
+    return opus_buffer
+
+def send_audio_message(recipient, lang, word):
+
+    audio_file = generate_audio_file(lang, word)
+    media_id = upload_audio(audio_file)
+    # media_id = stream_and_upload_audio(bucket_name, audio_path)
+    if media_id is None:
+        error_message = "Media_ID not found"
+        data = get_text_message_input(current_app.config["RECIPIENT_WAID"], error_message)
+        return send_message(error_message)
+    
+    url = f"https://graph.facebook.com/{current_app.config['VERSION']}/{current_app.config['PHONE_NUMBER_ID']}/messages"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {current_app.config['ACCESS_TOKEN']}",
+    }
+    data = {
+        "messaging_product": "whatsapp",
+        "to": recipient,
+        "type": "audio",
+        "audio": {
+            "id": media_id
+        }
+    }
+
+    response = requests.post(url, headers=headers, json=data)
+    if response.status_code == 200:
+        print("Audio message sent successfully")
+    else:
+        print(f"Failed to send audio message: {response.status_code} - {response.text}")
 
 def send_message(data):
     headers = {
@@ -447,6 +539,7 @@ def process_whatsapp_message(body):
     service = full_message_body.split()[0].strip().lower()
     language = full_message_body.split()[1].lower()
     words = [word.strip() for word in full_message_body.split(' ',2)[-1].split(',')]
+    to_say = full_message_body.split(" ",1)[1].strip().lower()
         
     if service == 'vocab':
 
@@ -459,6 +552,25 @@ def process_whatsapp_message(body):
             data = get_text_message_input(current_app.config["RECIPIENT_WAID"], response_message)
             send_message(data)
     
+    elif service == 'dis':
+        try:    
+            send_audio_message(current_app.config["RECIPIENT_WAID"],
+                                lang="fr",
+                                word=to_say)
+        except:
+            error_message = "Tried to send you a vocal, but could not."
+            data = get_text_message_input(current_app.config["RECIPIENT_WAID"], error_message)
+            send_message(data)
+
+    elif service == 'say':
+        try:
+            send_audio_message(current_app.config["RECIPIENT_WAID"],
+                            lang="en",
+                            word=to_say)
+        except:
+            error_message = "Tried to send you a vocal, but could not."
+            data = get_text_message_input(current_app.config["RECIPIENT_WAID"], error_message)
+
     else:
         response_message = "Error - no action taken."
         data = get_text_message_input(current_app.config["RECIPIENT_WAID"], response_message)

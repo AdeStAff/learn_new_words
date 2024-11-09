@@ -20,7 +20,7 @@
 - Specify the grammatical category of a word or expression, e.g., `vocab en shepherd (noun)`.
 - Retrieve the list of grammatical categories with: `vocab categories {language}`, e.g., `vocab categories fr`.
 - Add a quotation to the database by enclosing it in quotation marks, e.g., `vocab en shepherd (noun) "The shepherd guided his flock of sheep across the rolling hills as the sun set behind him."`.
-
+- Request *Vidya* to pronounce a word or sentence in English or French using `say {word}` for English or `dis {mot}` for French, e.g., `say I feel exhausted`, and *Vidya* will reply with an audio pronunciation.
 
 ## Where Do the Definitions Come From?
 
