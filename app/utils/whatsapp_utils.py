@@ -190,7 +190,7 @@ def extract_word_and_category_and_quote(text):
 
     return [word, cat, quote]
 
-def lookup_en_def(full_word):
+def lookup_en_def(full_word,advanced=False):
     
     word_definition=None
     cat = None
@@ -204,9 +204,7 @@ def lookup_en_def(full_word):
         cat = word_and_cat_and_quote[1]
     if len(word_and_cat_and_quote[2])>1:
         quote = word_and_cat_and_quote[2]
-    print("")
-    print(word)
-    print("")
+
     url = f"https://www.dictionaryapi.com/api/v3/references/learners/json/{word}?key={api_key}"
     response = requests.get(url)
 
@@ -215,8 +213,8 @@ def lookup_en_def(full_word):
         
         # If word not found
 
-        if len(data)>0 and "fl" not in data[0]:
-            # Use other dictionnary api
+        if (len(data)>0 and "fl" not in data[0]) or advanced:
+            # Use other Dictionary api
             second_api_key = os.getenv("DICT_DICT_KEY")
             
             url = f"https://www.dictionaryapi.com/api/v3/references/collegiate/json/{word}?key={second_api_key}"
@@ -224,7 +222,7 @@ def lookup_en_def(full_word):
             if response.status_code == 200:
                 data = response.json()
                 if len(data)>0 and "fl" not in data[0]:
-                    error_message = f"{word} not found in any dictionnary."
+                    error_message = f"{word} not found in any dictionary."
                     return word, cat, word_definition, quote, error_message
                 
         if cat is not None:
@@ -486,7 +484,11 @@ def add_row_to_padme_vocab(language, word):
     print(language)
 
     if language == "en":
-        word, cat, word_definition, quote, error_message = lookup_en_def(word)
+        if "advanced" in word:
+            word = re.sub('advanced','',word).strip().replace("  ", " ")
+            word, cat, word_definition, quote, error_message = lookup_en_def(word, advanced=True)
+        else:
+            word, cat, word_definition, quote, error_message = lookup_en_def(word, advanced=False)
     
     if language == "fren":
         word, cat, word_definition, quote, error_message = lookup_fr_to_en_def(word)
@@ -621,20 +623,32 @@ def process_whatsapp_message(body):
 
     elif service == 'keep':
         word, final_def = modify_last_definition(keep=True, to_keep=message_content)
-        update_message = "*Definition updated* ✅" + "\n\n*word*:\n" + final_def
+        match = re.search(r'•\xa0[^\n]+', final_def)
+        if match:
+            update_message = "*Definition updated* ✅" + f"\n\n*{word}*:\n" + final_def
+        else:
+            update_message = "*Definition updated* ✅" + f"\n\n*{word}*: " + final_def
         data = get_text_message_input(current_app.config["RECIPIENT_WAID"], update_message)
         send_message(data)
 
     elif service== 'delete':
-        modify_last_definition(keep=False, to_del=message_content)
-        update_message = "*Definition updated* ✅" + "\n\n*word*:\n" + final_def
+        word, final_def = modify_last_definition(keep=False, to_del=message_content)
+        match = re.search(r'•\xa0[^\n]+', final_def)
+        if match:
+            update_message = "*Definition updated* ✅" + f"\n\n*{word}*:\n" + final_def
+        else:
+            update_message = "*Definition updated* ✅" + f"\n\n*{word}*: " + final_def
         data = get_text_message_input(current_app.config["RECIPIENT_WAID"], update_message)
         send_message(data)
 
+    elif service == 'remove':
+        message = remove_def(message_content)
+        data = get_text_message_input(current_app.config["RECIPIENT_WAID"], message)
+        send_message(data)
 
     else:
         response_message = "Error - no action taken."
-        data = get_text_message_input(current_app.config["RECIPIENT_WAID"], response_message)
+        data = get_text_message_input(current_app.config["RECIPIENT_WAID"], message)
         send_message(data)
 
 def is_valid_whatsapp_message(body):
@@ -649,3 +663,33 @@ def is_valid_whatsapp_message(body):
         and body["entry"][0]["changes"][0]["value"].get("messages")
         and body["entry"][0]["changes"][0]["value"]["messages"][0]
     )
+
+def remove_def(message_content="last def"):
+
+    scope = ["https://spreadsheets.google.com/feeds",'https://www.googleapis.com/auth/spreadsheets',"https://www.googleapis.com/auth/drive.file","https://www.googleapis.com/auth/drive"]
+    creds_json = os.getenv("GOOGLE_SHEETS_CREDENTIALS")
+    creds_json = creds_json.replace('\n', '\\n')
+    creds_dict = json.loads(creds_json)
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+    client = gspread.authorize(creds)
+
+    sheet = client.open_by_key('1CloiuVCnGD38rPQogj1eG_yHAcQ7uxuQ4ICD_CswHhw').sheet1
+    num_rows = len(sheet.get_all_values())
+
+    body = message_content.lower().strip()
+    
+    if body == "last def":
+        sheet.delete_rows(num_rows)
+        message = "Last definition removed from database ✅"
+        return message
+    
+    else:
+        try:
+            column_words = sheet.col_values(2)[1:][::-1]
+            row_to_delete = num_rows - column_words.index(body)
+            sheet.delete_rows(row_to_delete)
+            message = f"*{body}* removed from database ✅"
+            return message
+        except ValueError:
+            message=f"Could not find {body} in database - no action taken."
+            return message

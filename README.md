@@ -22,6 +22,8 @@
 - Add a quotation to the database by enclosing it in quotation marks, e.g., `vocab en shepherd (noun) "The shepherd guided his flock of sheep across the rolling hills as the sun set behind him."`.
 - Request *Vidya* to pronounce a word or sentence in English or French using `say {word}` for English or `dis {mot}` for French, e.g., `say I feel exhausted`, and *Vidya* will reply with an audio pronunciation.
 - For the most recently defined word, you can either retain only specific definitions (e.g., `keep 1, 2` to keep only the first two definitions) or remove certain ones (e.g., `delete 3` to remove the third definition).
+- Remove a definition from the database using `remove {word}` (e.g. `remove poach` to remove the word "poach") or `remove last def` to remove most recent addition to the database. 
+- For English to English definitions, add the word "advanced" to use the Collegiate Dictionary instead of the Learner's Dictionary.
 
 ## Where Do the Definitions Come From?
 
