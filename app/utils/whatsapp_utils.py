@@ -8,9 +8,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 from pprint import pprint as pp
 import os
 from dotenv import load_dotenv
-from larousse_api import larousse
-from google.cloud import datastore, storage
-import mimetypes
+from google.cloud import datastore
 from io import BytesIO 
 from gtts import gTTS
 from pydub import AudioSegment
@@ -106,7 +104,6 @@ def send_audio_message(recipient, lang, word):
 
     audio_file = generate_audio_file(lang, word)
     media_id = upload_audio(audio_file)
-    # media_id = stream_and_upload_audio(bucket_name, audio_path)
     if media_id is None:
         error_message = "Media_ID not found"
         data = get_text_message_input(current_app.config["RECIPIENT_WAID"], error_message)
@@ -433,6 +430,56 @@ def lookup_fr_to_fr_def(full_word):
         error_message = f"There is a bug, please contact Augustin."
         return word, cat, word_definition, quote, error_message
 
+def modify_last_definition(keep=True, to_keep=None,to_del=None):
+    
+    scope = ["https://spreadsheets.google.com/feeds",'https://www.googleapis.com/auth/spreadsheets',"https://www.googleapis.com/auth/drive.file","https://www.googleapis.com/auth/drive"]
+    creds_json = os.getenv("GOOGLE_SHEETS_CREDENTIALS")
+    creds_json = creds_json.replace('\n', '\\n')
+    creds_dict = json.loads(creds_json)
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+    client = gspread.authorize(creds)
+    
+    sheet = client.open_by_key('1CloiuVCnGD38rPQogj1eG_yHAcQ7uxuQ4ICD_CswHhw').sheet1
+    column_values = sheet.col_values(4)
+    column_words = sheet.col_values(2)
+    word = column_words[-1]
+    last_value = column_values[-1] if column_values else None
+    matches = re.findall(r'•\xa0[^\n]+', last_value)
+
+    if keep:
+        final_def = ""
+        to_keep_lst = to_keep.split(",")
+        to_keep_lst = [int(k) - 1  for k in to_keep_lst]
+        for i,j in enumerate(to_keep_lst):
+            if i==0:
+                final_def += matches[j]
+            else:
+                final_def += "\n" + matches[j]
+        if len(re.findall(r'•\xa0[^\n]+', final_def))==1:
+            final_def = re.sub(r'•\xa0','',final_def).strip()
+    
+    else:
+        final_def_lst = matches
+        to_del_lst = to_del.split(",")
+        to_del_lst = sorted([int(k) - 1  for k in to_del_lst], reverse=True)
+        for i in to_del_lst:
+            del final_def_lst[i]
+        
+        final_def = ""
+        
+        for j,k in enumerate(final_def_lst):
+            if j==0:
+                final_def += k
+            else:
+                final_def += "\n" + k
+        if len(re.findall(r'•\xa0[^\n]+', final_def))==1:
+            final_def = re.sub(r'•\xa0','',final_def).strip()
+
+    num_rows = len(sheet.get_all_values())
+    sheet.update_cell(num_rows, 4, final_def)
+    
+    return word, final_def
+
 def add_row_to_padme_vocab(language, word):
     
     error_status = False
@@ -523,7 +570,7 @@ def add_row_to_padme_vocab(language, word):
 
         sheet.insert_row(new_row, num_rows + 1)
         if word_definition[0]==f'•':
-            message = f"*{word}*:\n {word_definition}"
+            message = f"*{word}*:\n{word_definition}"
         else:
             message = f"*{word}*: {word_definition}"
         
@@ -539,7 +586,7 @@ def process_whatsapp_message(body):
     service = full_message_body.split()[0].strip().lower()
     language = full_message_body.split()[1].lower()
     words = [word.strip() for word in full_message_body.split(' ',2)[-1].split(',')]
-    to_say = full_message_body.split(" ",1)[1].strip().lower()
+    message_content = full_message_body.split(" ",1)[1].strip().lower()
         
     if service == 'vocab':
 
@@ -556,7 +603,7 @@ def process_whatsapp_message(body):
         try:    
             send_audio_message(current_app.config["RECIPIENT_WAID"],
                                 lang="fr",
-                                word=to_say)
+                                word=message_content)
         except Exception as e:
             error_message = f"Tried to send you a vocal, but could not: {e}"
             data = get_text_message_input(current_app.config["RECIPIENT_WAID"], error_message)
@@ -566,11 +613,24 @@ def process_whatsapp_message(body):
         try:
             send_audio_message(current_app.config["RECIPIENT_WAID"],
                             lang="en",
-                            word=to_say)
+                            word=message_content)
         except Exception as e:
             error_message = f"Tried to send you a vocal, but could not: {e}"
             data = get_text_message_input(current_app.config["RECIPIENT_WAID"], error_message)
             send_message(data)
+
+    elif service == 'keep':
+        word, final_def = modify_last_definition(keep=True, to_keep=message_content)
+        update_message = "*Definition updated* ✅" + "\n\n*word*:\n" + final_def
+        data = get_text_message_input(current_app.config["RECIPIENT_WAID"], update_message)
+        send_message(data)
+
+    elif service== 'delete':
+        modify_last_definition(keep=False, to_del=message_content)
+        update_message = "*Definition updated* ✅" + "\n\n*word*:\n" + final_def
+        data = get_text_message_input(current_app.config["RECIPIENT_WAID"], update_message)
+        send_message(data)
+
 
     else:
         response_message = "Error - no action taken."

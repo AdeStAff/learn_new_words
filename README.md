@@ -21,6 +21,7 @@
 - Retrieve the list of grammatical categories with: `vocab categories {language}`, e.g., `vocab categories fr`.
 - Add a quotation to the database by enclosing it in quotation marks, e.g., `vocab en shepherd (noun) "The shepherd guided his flock of sheep across the rolling hills as the sun set behind him."`.
 - Request *Vidya* to pronounce a word or sentence in English or French using `say {word}` for English or `dis {mot}` for French, e.g., `say I feel exhausted`, and *Vidya* will reply with an audio pronunciation.
+- For the most recently defined word, you can either retain only specific definitions (e.g., `keep 1, 2` to keep only the first two definitions) or remove certain ones (e.g., `delete 3` to remove the third definition).
 
 ## Where Do the Definitions Come From?
 
